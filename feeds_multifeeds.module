@@ -1,0 +1,31 @@
+<?php
+
+/**
+ * Implementation of hook_feeds_plugins().
+ */
+function feeds_multifeeds_feeds_plugins() {    
+  $info['FeedsOPMLMultiParser'] = array(
+    'name' => 'OPML multi parser',
+    'description' => 'Parse OPML files with support for multiple feed types.',
+    'handler' => array(
+      'parent' => 'FeedsParser',
+      'class' => 'FeedsOPMLMultiParser',
+      'file' => 'FeedsOPMLMultiParser.inc',
+      'path' => drupal_get_path('module', 'feeds_multifeeds'),
+    ),
+  );
+  
+  $info['FeedsMultiFeedNodeProcessor'] = array(
+    'name' => 'Feed Multi Node processor',
+    'description' => 'Create <em>Feed nodes</em> of different types.',
+    'help' => 'Create <em>Feed nodes</em> from parsed content. Feed nodes are nodes that can import feeds themselves. This can be useful for instance when importing OPML feeds.',
+    'handler' => array(
+      'parent' => 'FeedsFeedNodeProcessor',
+      'class' => 'FeedsMultiFeedNodeProcessor',
+      'file' => 'FeedsMultiFeedNodeProcessor.inc',
+      'path' => drupal_get_path('module', 'feeds_multifeeds'),
+    ),
+  );
+  
+  return $info;
+}

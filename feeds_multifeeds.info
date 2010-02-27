@@ -1,0 +1,5 @@
+name = Feeds Multi Feeds 
+description = Expand feed into multiple feed node types
+package = Feeds
+dependencies[] = feeds
+core = 6.x
