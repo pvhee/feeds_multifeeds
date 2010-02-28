@@ -92,16 +92,20 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
     // Check that we have 3 feeds added (the main multifeed + our two created feeds)
     $this->assertEqual($count, 3, 'Found ' .$count. ' number of items.');
     
+    // Assert DB status for multifeed nodes (this is new!)
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'multifeed'));
+    $this->assertEqual($count, 2, 'Found ' .$count. ' number of items.');
+    
     // run cron so that feeds import nodes
     $this->drupalGet('cron.php');
     
      // Assert DB status for feed1 nodes.
-    $count1 = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feed1'));
-    $this->assertEqual($count1, 10, 'Accurate number of items in database: ' .$count1);
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feed1'));
+    $this->assertEqual($count, 10, 'Accurate number of items in database: ' .$count);
     
     // Assert DB status for feed2 nodes.
-    $count2 = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feed2'));
-    $this->assertEqual($count2, 25, 'Accurate number of items in database: ' .$count2);
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feed2'));
+    $this->assertEqual($count, 25, 'Accurate number of items in database: ' .$count);
   }
   
   public function createMultiFeed($id, $feed_id) {
@@ -123,7 +127,7 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
         ),
         array(
           'source' => 'xmlurl',
-          'target' => 'source',
+          'target' => 'url',
           'unique' => TRUE,
         ),
         array(
@@ -136,7 +140,7 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
     
     // Change some of the basic configuration.
     $edit = array(
-      'content_type' => '',
+      'content_type' => '', // don't attach
       'import_period' => FEEDS_SCHEDULE_NEVER,
     );
     $this->drupalPost('admin/build/feeds/edit/' .$id. '/settings', $edit, 'Save');    
@@ -163,7 +167,7 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
     // Change some of the basic configuration.
     $edit = array(
       'content_type' => $id,
-      'import_period' => 0, // we need to schedule import as often as possible, as import on create doesn't work
+      'import_period' => 0, // we need to schedule import as often as possible, as import on create is disabled here
       'import_on_create' => 1,
     );
     $this->drupalPost('admin/build/feeds/edit/' .$id. '/settings', $edit, 'Save');    

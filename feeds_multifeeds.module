@@ -20,7 +20,7 @@ function feeds_multifeeds_feeds_plugins() {
     'description' => 'Create <em>Feed nodes</em> of different types.',
     'help' => 'Create <em>Feed nodes</em> from parsed content. Feed nodes are nodes that can import feeds themselves. This can be useful for instance when importing OPML feeds.',
     'handler' => array(
-      'parent' => 'FeedsFeedNodeProcessor',
+      'parent' => 'FeedsNodeProcessor',
       'class' => 'FeedsMultiFeedNodeProcessor',
       'file' => 'FeedsMultiFeedNodeProcessor.inc',
       'path' => drupal_get_path('module', 'feeds_multifeeds'),
