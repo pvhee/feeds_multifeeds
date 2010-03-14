@@ -63,10 +63,7 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
        <outline title="Drupal Planet" text="" xmlUrl="'. $path .'drupalplanet.rss2" type="feed2" />
     </outline>
 </body>
-</opml>';
-    
-    //       <outline title="Drupal Planet" text="" xmlUrl="'. $path .'developmentseed.rss2" type="unknown_feed_type" />
-    
+</opml>';    
 
     // UTF 8 encode output string and write it to disk
     $output = utf8_encode($output);
@@ -132,7 +129,7 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
         ),
         array(
           'source' => 'type',
-          'target' => 'node_type',
+          'target' => 'type',
           'unique' => FALSE,
         ),
       )
@@ -207,4 +204,188 @@ class FeedsMultiFeedsTest extends FeedsWebTestCase {
   
 }
 
- 
+/**
+ * Test importing OPML that creates feed nodes.
+ */
+class FeedsOPMLToFeedsTest extends FeedsWebTestCase {
+  
+  /**
+   * Describe this test.
+   */
+  public function getInfo() {
+    return array(
+      'name' => t('OPML import to feed nodes.'),
+      'description' => t('Tests a feed configuration with file import, uses OPML parser and a feed node processor.'),
+      'group' => t('Feeds Multi Feeds'),
+    );
+  }
+
+  /**
+   * Set up test.
+   */
+  public function setUp() {
+    parent::setUp('feeds', 'feeds_ui', 'ctools', 'feeds_multifeeds');
+    $this->drupalLogin(
+      $this->drupalCreateUser(
+        array(
+          'administer feeds', 'administer nodes',
+        )
+      )
+    );
+  }
+  
+  /**
+   * Generate an OPML test feed.
+   *
+   * The purpose of this function is to create a dynamic OPML feed that points
+   * to feeds included in this test.
+   */
+  public function generateOPML() {
+    $path = $GLOBALS['base_url'] .'/'. drupal_get_path('module', 'feeds_multifeeds') .'/feeds/';
+
+    // Note: 'type' describes the content type
+    $output =
+'<?xml version="1.0" encoding="utf-8"?>
+<opml version="1.1">
+<head>
+    <title>OPML</title>
+    <dateCreated>Fri, 16 Oct 2009 02:53:17 GMT</dateCreated>
+    <ownerName>Nuvole</ownerName>
+</head>
+<body>
+  <outline text="Feeds test group" >
+       <outline title="Devseed News" text="" xmlUrl="'. $path .'developmentseed.rss2" />
+       <outline title="Drupal Planet" text="" xmlUrl="'. $path .'drupalplanet.rss2" />
+    </outline>
+</body>
+</opml>';    
+
+    // UTF 8 encode output string and write it to disk
+    $output = utf8_encode($output);
+    $file = $this->absolute() .'/'. file_directory_path() .'/test-opml-'. $this->randomName() .'.opml';
+    $handle = fopen($file, 'w');
+    fwrite($handle, $output);
+    fclose($handle);
+    return $file;
+  }
+  
+  /**
+   * Test node creation, refreshing/deleting feeds and feed items.
+   */
+  public function test() {
+    $this->createFeed('feed');
+    $this->createFeedFeed('feedfeed', 'feed');
+    
+    // Import OPML and assert.
+    $file = $this->generateOPML();
+    $this->importFile('feedfeed', $file);
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_source}'));
+    // Check that we have 3 feeds added (the feedfeed + two created feeds)
+    $this->assertEqual($count, 3, 'Found ' .$count. ' number of items.');
+    
+    // Assert DB status for feed nodes
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feedfeed'));
+    $this->assertEqual($count, 2, 'Found ' .$count. ' number of items.');
+    
+    // run cron so that feeds import nodes
+    $this->drupalGet('cron.php');
+    
+     // Assert DB status for feed nodes.
+    $count = db_result(db_query('SELECT COUNT(*) FROM {feeds_node_item} WHERE id="%s"', 'feed'));
+    $this->assertEqual($count, 35, 'Accurate number of items in database: ' .$count);
+  }
+  
+  public function createFeedFeed($id, $feed_id) {
+    // Create our master feed that will import a listing of feeds.
+    $this->createFeedConfiguration('Import OPML files generating feed node types.', $id);
+    
+    // Set and configure plugins.
+    $this->setPlugin($id, 'FeedsFileFetcher');
+    $this->setPlugin($id, 'FeedsOPMLParser');
+    $this->setPlugin($id, 'FeedsMultiFeedNodeProcessor');
+    
+    // Add mappings
+    $this->addMappings($id,
+      array(
+        array(
+          'source' => 'title',
+          'target' => 'title',
+          'unique' => FALSE,
+        ),
+        array(
+          'source' => 'xmlurl',
+          'target' => 'url',
+          'unique' => TRUE,
+        )
+      )
+    );
+    
+    // Change some of the basic configuration.
+    $edit = array(
+      'content_type' => '', // don't attach
+      'import_period' => FEEDS_SCHEDULE_NEVER,
+    );
+    $this->drupalPost('admin/build/feeds/edit/' .$id. '/settings', $edit, 'Save');    
+    
+    // Change default feed node type.
+    $edit = array(
+      'content_type' => $feed_id,
+    );
+    $this->drupalPost('admin/build/feeds/edit/' .$id. '/settings/FeedsMultiFeedNodeProcessor', $edit, 'Save');    
+  }
+  
+  public function createFeed($id) {
+    // Create content type
+    $this->drupalCreateContentType(array('type' => $id));
+    
+    // Create feed.
+    $this->createFeedConfiguration('Feed', $id);
+    
+    // Set and configure plugins.
+    $this->setPlugin($id, 'FeedsHTTPFetcher');
+    $this->setPlugin($id, 'FeedsSyndicationParser');
+    $this->setPlugin($id, 'FeedsNodeProcessor');
+    
+    // Change some of the basic configuration.
+    $edit = array(
+      'content_type' => $id,
+      'import_period' => 0, // we need to schedule import as often as possible, as import on create is disabled here
+      'import_on_create' => 1,
+    );
+    $this->drupalPost('admin/build/feeds/edit/' .$id. '/settings', $edit, 'Save');    
+
+    // Add mappings
+    $this->addMappings($id,
+      array(
+        array(
+          'source' => 'title',
+          'target' => 'title',
+          'unique' => FALSE,
+        ),
+        array(
+          'source' => 'description',
+          'target' => 'body',
+          'unique' => FALSE,
+        ),
+        array(
+          'source' => 'timestamp',
+          'target' => 'created',
+          'unique' => FALSE,
+        ),
+        array(
+          'source' => 'url',
+          'target' => 'url',
+          'unique' => TRUE,
+        ),
+        array(
+          'source' => 'guid',
+          'target' => 'guid',
+          'unique' => TRUE,
+        ),
+      )
+    );
+    
+  }
+  
+  
+}

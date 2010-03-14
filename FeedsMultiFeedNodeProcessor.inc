@@ -94,21 +94,6 @@ class FeedsMultiFeedNodeProcessor extends FeedsNodeProcessor {
   }
 
   /**
-   * Return available mapping targets.
-   */
-  public function getMappingTargets() {
-    // Note: source is now called url to be consistent with FeedsNodeProcessor
-    $targets = parent::getMappingTargets() + array(
-      'node_type' => array(
-        'name' => t('Feed node type'),
-        'callback' => 'feeds_multifeeds_set_node_type',
-        'description' => t('The node type of the feed node. If the node type does not have an attached importer configuration, it will replaced by the default node type specified in the settings.'),
-      ),
-    );
-    return $targets;
-  }
-
-  /**
    * Override setTargetElement to operate on a target item that is a node.
    */
   public function setTargetElement($target_node, $target_element, $value) {
@@ -118,6 +103,17 @@ class FeedsMultiFeedNodeProcessor extends FeedsNodeProcessor {
       // property. See feeds_nodeapi() how $node->feeds gets stored.
       $class = get_class($this->feedNodeImporter()->fetcher);
       $target_node->feeds[$class]['source'] = $value;
+    }
+    elseif ($target_element == 'type') {
+      if (feeds_get_importer_id($value)) {
+        // only accept node types with attached import configuration
+        $target_node->type = $value;
+      } 
+      else {
+        // set default value
+        $target_node->type = $this->config['content_type'];  
+      }
+      node_object_prepare($target_node);
     }
   }
   
@@ -131,29 +127,6 @@ class FeedsMultiFeedNodeProcessor extends FeedsNodeProcessor {
     else {
       throw new Exception(t('Content type to be created is not a valid Feed content type.'));
     }
-  }
-  
+  } 
 
-}
-  
-/**
- * Callback method to set the feed node type.
- * 
- * @see getMappingTargets()
- *
- * @param $node
- *   The target node.
- * @param $field_name
- *   The name of field on the target node to map to.
- * @param $feed_element
- *   The value to be mapped. Should be a feed content type.
- */
-function feeds_multifeeds_set_node_type($node, $target, $feed_element) {
-  if ($feed_element != $node->type) {
-    if (feeds_get_importer_id($feed_element)) {
-      $node->type = $feed_element;
-      // we need to prepare the node again now its type has changed
-      node_object_prepare($node);
-    }
-  }
 }
